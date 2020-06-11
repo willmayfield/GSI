@@ -1,4 +1,3 @@
-#ifdef RR_CLOUDANALYSIS
 subroutine setupcldtot(lunin,mype,bwork,awork,nele,nobs,is,conv_diagsave)
 !$$$  subprogram documentation block
 !!                .      .    .                                       .
@@ -71,6 +70,7 @@ subroutine setupcldtot(lunin,mype,bwork,awork,nele,nobs,is,conv_diagsave)
   use constants, only: zero,one, h1000
   use gsdcloudlib_pseudoq_mod, only: cloudLWC_pseudo,cloudCover_Surface_col
 
+#ifdef RR_CLOUDANALYSIS
   implicit none
 
   real(r_single) :: cloudqvis
@@ -1006,44 +1006,7 @@ subroutine setupcldtot(lunin,mype,bwork,awork,nele,nobs,is,conv_diagsave)
 
   end subroutine contents_netcdf_diag_mem_
 
-end subroutine setupcldtot
-
 #else
-
-subroutine setupcldtot(lunin,mype,bwork,awork,nele,nobs,is,conv_diagsave)
-!$$$  subprogram documentation block
-!!                .      .    .                                       .
-! subprogram:    setupcldtot      compute rhs of oi for pseudo moisture
-! observations from
-!                                 METAR and Satellite cloud observations
-!   prgmmr: Ladwag          org: GSD                date: 2019-06-01
-!
-! program history log:
-!   2016-04-06  Ladwig new setup routine for METAR ceilometer obs
-!
-!   input argument list:
-!     lunin    - unit from which to read observations
-!     mype     - mpi task id
-!     nele     - number of data elements per observation
-!     nobs     - number of observations
-!
-!   output argument list:
-!     bwork    - array containing information about obs-ges statistics
-!     awork    - array containing information for data counts and gross checks
-!
-! attributes:
-!   language: f90
-!   machine:  
-!
-!
-!
-!$$$
-! Declare passed variables
-  use kinds, only: r_kind,i_kind
-  use gridmod, only: nsig
-  use qcmod, only: npres_print
-  use convinfo, only: nconvtype
-
   implicit none
 
   logical                                          ,intent(in   ) :: conv_diagsave
@@ -1052,6 +1015,6 @@ subroutine setupcldtot(lunin,mype,bwork,awork,nele,nobs,is,conv_diagsave)
   real(r_kind),dimension(npres_print,nconvtype,5,3),intent(inout) :: bwork
   integer(i_kind)                                  ,intent(inout) :: is	! ndat index
 
+#endif
 end subroutine setupcldtot
 
-#endif
