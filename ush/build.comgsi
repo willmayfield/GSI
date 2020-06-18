@@ -16,10 +16,16 @@ source /etc/profile.d/modules.sh
 if [[ "`grep -i "theia" /etc/hosts | head -n1`" != "" ]] ; then ###theia
     modulefile="/home/rtrr/PARM_EXEC/modulefiles/modulefile.theia.GSI_UPP_WRF"
 elif [[ "`grep -i "hera" /etc/hosts | head -n1`" != "" ]] ; then ###hera
-    export GRIB2PATH="/scratch2/NCEPDEV/nwprod/NCEPLIBS/compilers/intel/18.0.5.274/lib"
+    #export GRIB2PATH="/scratch2/NCEPDEV/nwprod/NCEPLIBS/compilers/intel/18.0.5.274/lib"
     modulefile="/home/rtrr/PARM_EXEC/modulefiles/modulefile.hera.GSI_UPP_WRF"
+    export G2_LIB4="/scratch2/BMC/wrfruc/gge/codes/WPS/WPS.tanya/ungrib/src/ngl/g2/libg2_4.a"
+    export G2TMPL_LIB="/scratch2/BMC/wrfruc/gge/codes/UPP/GSD_UPP_17oct2019/comupp/lib/libg2tmpl.a"
+    export GRIB2INC="/scratch2/BMC/wrfruc/gge/codes/UPP/GSD_UPP_17oct2019/comupp/include"
 elif [[ -d /jetmon ]] ; then ### jet
     modulefile="/home/rtrr/PARM_EXEC/modulefiles/modulefile.jet.GSI_UPP_WRF"
+    export G2_LIB4="/lfs4/BMC/wrfruc/gge/precompiled/WPSV3.9/ungrib/src/ngl/g2/libg2_4.a"
+    export G2TMPL_LIB="/lfs4/BMC/wrfruc/gge/precompiled/comupp/lib/libg2tmpl.a"
+    export GRIB2INC="/lfs4/BMC/wrfruc/gge/precompiled/comupp/include"
 elif [[ -d /glade ]] ; then  ### cheyenne
     modulefile="/glade/p/ral/jntp/gge/modulefiles/modulefile.cheyenne.GSI_UPP_WRF"
 else
