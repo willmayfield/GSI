@@ -1,0 +1,11 @@
+module purge
+module load intel/18.0.5.274
+module load impi/2018.4.274
+module load szip/2.1
+module load hdf5parallel/1.10.6
+module load netcdf-hdf5parallel/4.7.4
+module load pnetcdf/1.6.1
+module load nco/4.1.0
+module load cnvgrib/1.4.0
+module load cmake/3.16.1
+

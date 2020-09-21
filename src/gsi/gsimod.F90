@@ -383,6 +383,7 @@
 !  03-11-2019 Collard   Introduce ec_amv_qc as temporary control of GOES-16/17 AMVS
 !  06-19-2019 Hu        Add option reset_bad_radbc for reseting radiance bias correction when it is bad
 !  06-25-2019 Hu        Add option print_obs_para to turn on OBS_PARA list
+!  09-23-2019 Martin    Add option use_gfs_ncio to read in first-guess netCDF file
 !
 !EOP
 !-------------------------------------------------------------------------
@@ -562,6 +563,7 @@
 !     lupp - if T, UPP is used and extra variables are output
 !     binary_diag - trigger binary diag-file output (being phased out)
 !     netcdf_diag - trigger netcdf diag-file output
+!     use_gfs_ncio - option to use netCDF to read global model FV3-GFS first guess
 !
 !      l_wcp_cwm      - namelist logical whether to use swcp/lwcp operator that includes cwm
 !
@@ -592,7 +594,7 @@
        idmodel,iwrtinc,lwrite4danl,nhr_anal,jiterstart,jiterend,lobserver,lanczosave,llancdone, &
        lferrscale,print_diag_pcg,tsensible,lgschmidt,lread_obs_save,lread_obs_skip, &
        use_gfs_ozone,check_gfs_ozone_date,regional_ozone,lwrite_predterms,&
-       lwrite_peakwt,use_gfs_nemsio,sfcnst_comb,liauon,use_prepb_satwnd,l4densvar,ens_nstarthr,&
+       lwrite_peakwt,use_gfs_nemsio,use_gfs_ncio,sfcnst_comb,liauon,use_prepb_satwnd,l4densvar,ens_nstarthr,&
        use_gfs_stratosphere,pblend0,pblend1,step_start,diag_precon,lrun_subdirs,&
        use_sp_eqspace,lnested_loops,lsingleradob,thin4d,use_readin_anl_sfcmask,&
        luse_obsdiag,id_drifter,verbose,print_obs_para,lsingleradar,singleradar,lnobalance, &
@@ -602,7 +604,7 @@
        rmesh_vr,zmesh_dbz,zmesh_vr, ntilt_radarfiles, whichradar,&
        radar_no_thinning,ens_hx_dbz_cut,static_gsi_nopcp_dbz,rmesh_dbz,&
        minobrangevr, maxtiltdbz, mintiltvr,mintiltdbz,if_vterminal,if_vrobs_raw,&
-       if_model_dbz,imp_physics,lupp,netcdf_diag,binary_diag,l_wcp_cwm,use_gfs_ncio
+       if_model_dbz,imp_physics,lupp,netcdf_diag,binary_diag,l_wcp_cwm
 
 ! GRIDOPTS (grid setup variables,including regional specific variables):
 !     jcap     - spectral resolution
@@ -640,6 +642,7 @@
 !     use_sp_eqspac     - if .true., then ensemble grid is equal spaced, staggered 1/2 grid unit off
 !                         poles.  if .false., then gaussian grid assumed for ensemble (global only)
 !     wrf_mass_hybridcord - logical for using WRF MASS CORE with hybrid vertical coordinate
+
 
 
   namelist/gridopts/jcap,jcap_b,nsig,nlat,nlon,nlat_regional,nlon_regional,&
