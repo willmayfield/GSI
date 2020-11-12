@@ -327,3 +327,4 @@ project(GSI)
     endforeach( REG_TEST )
     set_tests_properties( ${REG_TEST_NAMES} PROPERTIES TIMEOUT 86400 )
   endif()
+
