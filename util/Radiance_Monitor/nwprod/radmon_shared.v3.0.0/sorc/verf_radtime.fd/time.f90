@@ -9,10 +9,11 @@ program time
 !************************************************************************
 
   use read_diag
-  use bad_obs
+  use low_count
   use bad_penalty
   use bad_chan
   use valid 
+  use kinds, only: i_kind
 
   implicit none
   integer ntype,mregion,surf_nregion,max_surf_region
@@ -24,7 +25,8 @@ program time
   character(8) stid
   character(20) satname,stringd,satsis
   character(10) dum,satype,dplat
-  character(80) string,diag_rad,data_file,dfile,ctl_file
+  character(80) string,data_file,dfile,ctl_file
+  character(500) diag_rad
   character(40),dimension(max_surf_region):: region
   character(40),dimension(mregion):: surf_region
   character :: command
@@ -39,6 +41,7 @@ program time
   integer :: channel_obs
   integer :: iret, ier, ver
   integer npred_radiag
+  integer(i_kind)       :: istatus
 
   real rread, pen, bound
   real rlat, rlon, rmiss, obs
@@ -58,9 +61,10 @@ program time
   type(diag_data_chan_list  ),allocatable :: data_chan(:)
   type(diag_data_extra_list) ,allocatable :: data_extra(:,:)
 
-  logical valid_count, valid_penalty
-  integer       nsnow, nland, nwater, nice, nmixed, ntotal
-  integer       nnsnow, nnland, nnwater, nnmixed, nntotal
+  logical  valid_count, valid_penalty
+  integer  nsnow, nland, nwater, nice, nmixed, ntotal
+  integer  nnsnow, nnland, nnwater, nnmixed, nntotal
+  real     avg_cnt
 
 ! Namelist with defaults
   logical               :: retrieval            = .false.
@@ -70,8 +74,9 @@ program time
   character(3)          :: gesanl               = 'ges'
   integer               :: little_endian        = 1
   character(3)          :: rad_area             = 'glb'
+  logical               :: netcdf               = .false.
   namelist /input/ satname,iyy,imm,idd,ihh,idhh,incr,nchanl,&
-       suffix,imkctl,imkdata,retrieval,gesanl,little_endian,rad_area
+       suffix,imkctl,imkdata,retrieval,gesanl,little_endian,rad_area,netcdf
 
   data luname,lungrd,lunctl,lndiag / 5, 51, 52, 21 /
   data rmiss /-999./
@@ -143,11 +148,9 @@ program time
   write(6,*)'ctl_file =',ctl_file 
   write(6,*)'suffix   =',suffix
 
-! Open unit to diagnostic file.  Read portion of
-! header to see if file exists
-  open(lndiag,file=diag_rad,form='unformatted')
-  read(lndiag,err=900,end=900) dum
-  rewind lndiag
+
+  call set_netcdf_read( netcdf )
+  call open_radiag( diag_rad, lndiag, istatus )
 
 ! File exists.  Read header
   call get_radiag ('version',ver,ier)
@@ -181,10 +184,10 @@ program time
   date = stringd(2:9)
   cycle = stringd(10:11) 
 
-!  call open_bad_obs_file( date, cycle, ios )
   if ( trim(gesanl) == 'ges' ) then
      call open_bad_penalty_file( date, cycle, ios )
      call open_bad_chan_file( date, cycle, ios )
+     call open_low_count_file( date, cycle, ios )
 
      call load_base( satname, ios )
   endif
@@ -310,8 +313,6 @@ program time
            if (data_chan(j)%errinv > 1.e-6) then
               pen        =  (data_chan(j)%errinv*(data_chan(j)%omgbc))**2
               cor_tot(1) =  (data_chan(j)%omgnbc - data_chan(j)%omgbc)
-!              nbc_omg(1) = - data_chan(j)%omgnbc
-!              bc_omg(1)  = - data_chan(j)%omgbc
 
               omgnbc(1)  =   data_chan(j)%omgnbc
               omgbc(1)   =   data_chan(j)%omgbc            
@@ -320,8 +321,6 @@ program time
               omgbc(2)   =  (data_chan(j)%omgbc)**2
  
               cor_tot(2) =  (data_chan(j)%omgnbc - data_chan(j)%omgbc)**2
-!              nbc_omg(2) =  (data_chan(j)%omgnbc)**2
-!              bc_omg(2)  =  (data_chan(j)%omgbc)**2
 
               do i=1,nreg
                  k=jsub(i)
@@ -332,9 +331,7 @@ program time
 
                  do ii=1,2
                     tot_cor(j,k,ii) = tot_cor(j,k,ii) + cor_tot(ii)
-!                    omg_nbc(j,k,ii) = omg_nbc(j,k,ii) + nbc_omg(ii)
                     omg_nbc(j,k,ii) = omg_nbc(j,k,ii) + omgnbc(ii)
-!                    omg_bc(j,k,ii)  = omg_bc(j,k,ii)  + bc_omg(ii)
                     omg_bc(j,k,ii)  = omg_bc(j,k,ii)  + omgbc(ii)
                  end do
 
@@ -361,14 +358,15 @@ program time
 
            ! --- validate the count value for region 1 (global)
            !
-!           if ( use(j,k) > 0.0 .AND. k == 1 .AND. imkdata == 1 ) then
-!              call validate_count( j, k, count(j,k), valid_count, iret )
-!              write (*,*) ' valid_count, iret = ', valid_count, iret 
-!              if (  (iret == 0) .AND. (valid_count .eqv. .FALSE.) ) then
-!                 write (*,*) ' calling write_bad_obs '
-!                 call write_bad_obs( satname, nu_chan(j), k, count(j,k) )
-!              end if
-!           end if
+           if ( use(j,k) > 0.0 .AND. k == 1 .AND. imkdata == 1 ) then
+              call validate_count( j, k, count(j,k), valid_count, avg_cnt, iret )
+              write (*,*) ' valid_count, iret = ', valid_count, iret 
+
+              if (  (iret == 0) .AND. (valid_count .eqv. .FALSE.) ) then
+                 write (*,*) ' calling write_low_count '
+                 call write_low_count( satname, nu_chan(j), k, count(j,k), avg_cnt )
+              end if
+           end if
 
            if (count(j,k)>0) then
                test_pen(j,k)=penalty(j,k)/count(j,k)
@@ -396,11 +394,6 @@ program time
 !    it using write_bad_chan().  
 !
 
-!
-!    This is for testing purposes only
-!     channel_count(1) = 0.0
-!     write(6,*)' header_chan(j)%iuse, channel_count(1) = ', header_chan(1)%iuse, channel_count(1)
-!
      do j=1,n_chan
 !        write(6,*)' j, header_chan(j)%iuse, channel_count(j) = ', j, header_chan(j)%iuse, channel_count(j)
 !        if( header_chan(j)%iuse > 0.0 ) then
@@ -423,7 +416,7 @@ program time
      end do	! channel loop
 
      if ( trim(gesanl) == 'ges' ) then
-!       call close_bad_obs_file()
+        call close_low_count_file()
         call close_bad_penalty_file()
         call close_bad_chan_file()
      endif

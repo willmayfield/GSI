@@ -32,13 +32,16 @@ subroutine write_all(increment)
 ! use regional_io, only: write_regional_analysis
   use regional_io_mod, only: regional_io_class
   use gsi_rfv3io_mod, only: wrfv3_netcdf
+  use gsi_rfv3io_mod, only: bg_fv3regfilenameg 
 
   use ncepgfs_io, only: write_gfs
 
-  use gsi_bundlemod, only: gsi_bundlegetpointer
+  use gsi_bundlemod, only: gsi_bundle, gsi_bundlegetpointer
   use gsi_metguess_mod, only: gsi_metguess_bundle
 
   use mpeu_util, only: die
+
+  use control_vectors, only: control_vector
   
   implicit none
 
@@ -117,7 +120,7 @@ subroutine write_all(increment)
 ! Regional output
   if (regional) then
      if (fv3_regional) then
-        call wrfv3_netcdf
+        call wrfv3_netcdf(bg_fv3regfilenameg)
      else
         call io%write_regional_analysis(mype)
      endif

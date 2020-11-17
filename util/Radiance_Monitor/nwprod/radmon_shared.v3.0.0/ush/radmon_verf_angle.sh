@@ -76,9 +76,6 @@ rgnTM=${rgnTM:-}
 
 export PDATE=${1:-${PDATE:?}}
 
-scr=radmon_verf_angle.sh
-msg="${scr} HAS STARTED"
-postmsg "$jlogfile" "$msg"
 echo " REGIONAL_RR, rgnHH, rgnTM = $REGIONAL_RR, $rgnHH, $rgnTM"
 netcdf_boolean=".false."
 if [[ $RADMON_NETCDF -eq 1 ]]; then
@@ -229,8 +226,8 @@ EOF
             ${COMPRESS} -f ${angl_file}
          fi
 
-         if [[ -s ${angle_ctl} ]]; then
-            ${COMPRESS} -f ${angle_ctl}
+         if [[ -s ${angl_ctl} ]]; then
+            ${COMPRESS} -f ${angl_ctl}
          fi 
 
 
@@ -263,8 +260,6 @@ if [[ "$VERBOSE" = "YES" ]]; then
    echo $(date) EXITING $0 error code ${err} >&2
 fi
 
-msg="${scr} HAS ENDED"
-postmsg "$jlogfile" "$msg"
 
 echo "<-- radmon_verf_angle.sh"
 exit ${err}

@@ -117,7 +117,6 @@ subroutine read_dbz_mrms_netcdf(nread,ndata,nodata,infile,obstype,lunout,sis,nob
 !
 !$$$ end documentation block
   use netcdf
-  use mpimod,only:mype
   use kinds, only: r_kind,r_double,i_kind,r_single
   use constants, only: zero,half,one,two,deg2rad,rearth,rad2deg, &
                        one_tenth,r1000,r60,r60inv,r100,r400
@@ -599,7 +598,6 @@ strct_in_dbz(v,k)%field(:,:)=obdata_nc(:,:)
   write(6,*)'READ_dBZ: # ndata         =',ndata
 
 !---Write observation to scratch file---!
-   write(6,*)'thinkmype is ',mype,  ' ',maxdat,nchanl,ndata 
   
   call count_obs(ndata,maxdat,ilat,ilon,cdata_all,nobs)
   write(lunout) obstype,sis,maxdat,nchanl,ilat,ilon
