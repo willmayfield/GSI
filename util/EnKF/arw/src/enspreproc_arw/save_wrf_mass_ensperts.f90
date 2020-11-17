@@ -98,3 +98,16 @@
    call stop2(555)
 
 end program
+
+SUBROUTINE wrf_debug( level , str )
+  IMPLICIT NONE
+  CHARACTER*(*) str
+  INTEGER , INTENT (IN) :: level
+  INTEGER               :: debug_level
+  CHARACTER (LEN=256) :: time_str
+  CHARACTER (LEN=256) :: grid_str
+  CHARACTER (LEN=512) :: out_str
+  write(*,*) 'wrf_debug called !'
+  RETURN
+END SUBROUTINE wrf_debug
+

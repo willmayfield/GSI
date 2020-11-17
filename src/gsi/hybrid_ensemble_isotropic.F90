@@ -1350,7 +1350,11 @@ end subroutine normal_new_factorization_rf_y
 
 !     regional_ensemble_option = 3: ensembles are ARW netcdf format.
 
-                call wrf_mass_enspert%get_wrf_mass_ensperts(en_perts,nelen,ps_bar)
+                if(i_en_perts_io==3) then ! get en_perts from save files
+                   call en_perts_get_from_save_fulldomain_arw(nelen)
+                else
+                   call wrf_mass_enspert%get_wrf_mass_ensperts(en_perts,nelen,ps_bar)
+                endif
 
              case(4)
 

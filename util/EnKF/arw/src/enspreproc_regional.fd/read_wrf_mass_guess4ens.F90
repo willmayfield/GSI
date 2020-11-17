@@ -165,8 +165,8 @@ subroutine read_wrf_mass_netcdf_guess4ens(mype)
 ! next general_grid2sub to go to regional grid subdomains.
     call general_grid2sub(grd,work_reg,work_sub)
     ges_vpt_it(:,:)=real(work_sub(:,:,1,1),r_kind)
-    write(*,'(a,I5,2f15.7)') 'ges_vpt_it=',mype,maxval(ges_vpt_it), &
-                                minval(ges_vpt_it)
+!    write(*,'(a,I5,2f15.7)') 'ges_vpt_it=',mype,maxval(ges_vpt_it), &
+!                                minval(ges_vpt_it)
 
 ! read qvapor total: q_integralc4h
     read(lendian_in) ((temp1(i,j),i=1,im),j=1,jm)
@@ -184,8 +184,8 @@ subroutine read_wrf_mass_netcdf_guess4ens(mype)
 ! next general_grid2sub to go to regional grid subdomains.
     call general_grid2sub(grd,work_reg,work_sub)
     ges_q_integralc4h_it(:,:)=real(work_sub(:,:,1,1),r_kind)
-    write(*,'(a,I5,2f15.7)') 'ges_q_integralc4h_it=',mype, &
-       maxval(ges_q_integralc4h_it),  minval(ges_q_integralc4h_it)
+!    write(*,'(a,I5,2f15.7)') 'ges_q_integralc4h_it=',mype, &
+!       maxval(ges_q_integralc4h_it),  minval(ges_q_integralc4h_it)
 
 ! read topo
     read(lendian_in) ((temp1(i,j),i=1,im),j=1,jm)

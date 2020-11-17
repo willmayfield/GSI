@@ -109,8 +109,14 @@ subroutine get_gefs_for_regional_enspro(enpert4arw,wrt_pert_sub,wrt_pert_mem,jca
   real(r_single),allocatable,dimension(:,:,:):: w3
   real(r_single),allocatable,dimension(:,:):: w2
   real(r_single),allocatable,dimension(:,:,:,:)::en_perts
-  real(r_kind),dimension(:,:,:),allocatable:: workh
+  real(r_kind),dimension(:,:,:,:),allocatable:: workh
   real(r_kind),dimension(:),allocatable:: z1
+  integer, dimension(:), allocatable :: pert_unit
+
+  logical, parameter :: wordy_write_logging=.false.
+
+  logical :: iwrite
+  integer :: nproc, my_write_count, writing_rank, workh_index, iworkh
 
   character(len=*),parameter::myname='get_gefs_for_regional'
   real(r_kind) bar_norm,sig_norm,kapr,kap1,trk
@@ -1313,50 +1319,158 @@ subroutine get_gefs_for_regional_enspro(enpert4arw,wrt_pert_sub,wrt_pert_mem,jca
      allocate(vector(num_fields))
      vector=.false.
 
-     if(mype==0) write(*,*) 'final==',inner_vars,grd_ens%nlat,grd_ens%nlon,grd_ens%nsig,num_fields,regional
+     if(wordy_write_logging .and. mype==0) then
+        write(*,*) 'final==',inner_vars,grd_ens%nlat,grd_ens%nlon, &
+                   grd_ens%nsig,num_fields,regional
+     endif
+
      call general_sub2grid_create_info(grd_arw,inner_vars,  &
                     grd_ens%nlat,grd_ens%nlon,grd_ens%nsig, &
                                num_fields,regional,vector)
 
      allocate(z1(grd_arw%inner_vars*grd_arw%nlat*grd_arw%nlon))
-     allocate(workh(grd_arw%inner_vars,grd_arw%nlat,grd_arw%nlon))
 
      sig_norm=1.0_r_kind/sig_norm
-     do n=1,n_ens
-        if(mype==0) then
+
+     ! nproc = 1 more than highest rank to use for writing:
+     nproc=npe
+
+     ! Figure out how many files my rank will write:
+     my_write_count=0
+     count_local_workh: do n=1,n_ens
+        writing_rank=max(min((n*nproc)/n_ens,nproc-1),0)
+        if(writing_rank==mype) then
+           my_write_count = my_write_count+1
+        endif
+     end do count_local_workh
+
+     init_work_arrays: if(my_write_count<1) then
+        ! We never write, but we need to allocate and initialize
+        ! arrays so that debuggers will not flag an invalid array
+        ! being sent as an argument.
+        allocate(workh(1,1,1,1))
+        allocate(pert_unit(1))
+        workh=0
+     else
+        ! Allocate enough 3D workh slices and units to fit all of our writes:
+        allocate(workh(grd_arw%inner_vars,grd_arw%nlat, &
+                       grd_arw%nlon,my_write_count))
+        allocate(pert_unit(my_write_count))
+     endif init_work_arrays
+     pert_unit=-1
+     
+194  format("rank ",I0,": member ",I0," file ",A,": ",A)
+199  format("rank ",I0,": member ",I0," level ",I0," file ",A,": ",A)
+
+     ! Open output files on appropriate ranks and write headers to each file:
+     iworkh=1
+     init_output_files: do n=1,n_ens
+        writing_rank=max(min((n*nproc)/n_ens,nproc-1),0)
+        iwrite= ( mype==writing_rank )
+        init_one_output_file: if(iwrite) then
            write(filename,'(a,I4.4)') 'en_perts4arw.mem',n
-           if(mype==0) then
-              write(*,*) 'save perturbations for ', trim(filename)
+
+           if(wordy_write_logging) then
+              write(*,194) &
+                   mype, n, trim(filename), 'open file and write header'
               write(*,*) nc3d,nc2d,cvars3d,cvars2d
               write(*,*) grd_arw%nlat,grd_arw%nlon,grd_arw%nsig
            endif
-           open(iunit,file=trim(filename),form='unformatted')
-              write(iunit) nc3d,nc2d,cvars3d,cvars2d
-              write(iunit) grd_arw%nlat,grd_arw%nlon,grd_arw%nsig
+
+           open(newunit=iunit, &
+                file=trim(filename),form='unformatted')
+           pert_unit(iworkh)=iunit
+           write(iunit) nc3d,nc2d,cvars3d,cvars2d
+           write(iunit) grd_arw%nlat,grd_arw%nlon,grd_arw%nsig
+
+           iworkh=iworkh+1
+        endif init_one_output_file
+     end do init_output_files
+
+     sigma_loop: do k=1,nc3d*grd_ens%nsig+nc2d
+        ! Gather data for level k to each processor that will write it.
+        iworkh=1
+        gather_data: do n=1,n_ens
+           writing_rank=max(min((n*nproc)/n_ens,nproc-1),0)
+           iwrite= ( mype==writing_rank )
+           
+           if(iwrite) then
+              write(filename,'(a,I4.4)') 'en_perts4arw.mem',n
+              if(wordy_write_logging) then
+                 write(*,199) &
+                      mype, n, k, trim(filename), 'gather perturbations'
+              endif
+           end if
+
+           ! Copy to 1D z1 array for communication.
+           !$OMP PARALLEL DO PRIVATE(i,j,ii)
+           fill_z1_j: do j=1,lon2
+              fill_z1_i: do i=1,lat2
+                 ii= 1 + (j-1)*lat2 + (i-1)
+                 z1(ii)=en_perts(n,i,j,k)*sig_norm
+              end do fill_z1_i
+           end do fill_z1_j
+
+           ! change Ps from CB to Pa
+           if(k==nc3d*grd_ens%nsig+1) then
+              !$OMP PARALLEL DO PRIVATE(i,j,ii)
+              scale_z1_j: do j=1,lon2
+                 scale_z1_i: do i=1,lat2
+                    ii= 1 + (j-1)*lat2 + (i-1)
+                    z1(ii)=z1(ii)*1000.0
+                 enddo scale_z1_i
+              enddo scale_z1_j
+           end if
+
+           ! Collect z1 to writing rank's workh array:
+           call general_gather2grid(grd_arw,z1,workh(:,:,:,iworkh),writing_rank)
+           
+           if(iwrite) then
+              ! Go to next index of writing array.
+              iworkh=iworkh+1
+           endif
+        end do gather_data
+
+        ! Write data for level k on each process that should write:
+        iworkh=1
+        write_data: do n=1,n_ens
+           writing_rank=max(min((n*nproc)/n_ens,nproc-1),0)
+           iwrite= ( mype==writing_rank )
+
+           write_one_file: if(iwrite) then
+              write(filename,'(a,I4.4)') 'en_perts4arw.mem',n
+              if(wordy_write_logging) then
+                 write(*,199) &
+                      mype, n, k, trim(filename), 'write perturbations'
+                 write(*,*) nc3d,nc2d,cvars3d,cvars2d
+                 write(*,*) grd_arw%nlat,grd_arw%nlon,grd_arw%nsig
+                 write(*,*) k,maxval(workh),minval(workh)
+              endif
+
+              iunit=pert_unit(iworkh)
+              write(iunit) workh(:,:,:,iworkh)
+           endif write_one_file
+        end do write_data
+     end do sigma_loop
+
+     ! Close all files
+     iworkh=1
+     close_output_files: do n=1,n_ens
+        writing_rank=max(min((n*nproc)/n_ens,nproc-1),0)
+        iwrite= ( mype==writing_rank )
+        if(iwrite) then
+           if(wordy_write_logging) then
+              write(*,194) &
+                   mype, n, trim(filename), 'close perturbation file'
+           endif
+           iunit=pert_unit(iworkh)
+           close(iunit)
+           pert_unit(iworkh)=-1
+           iworkh=iworkh+1
         endif
+     enddo close_output_files
 
-        do k=1,nc3d*grd_ens%nsig+nc2d
-
-            ii=0
-            do j=1,lon2
-               do i=1,lat2
-                  ii=ii+1
-                  z1(ii)=en_perts(n,i,j,k)*sig_norm
-               end do
-            end do
-            if(k==nc3d*grd_ens%nsig+1) z1=z1*1000.0 ! change Ps from CB to Pa)
-            call general_gather2grid(grd_arw,z1,workh,0)
-            if(mype==0) then
-                write(*,*) k,maxval(workh),minval(workh)
-                write(iunit) workh
-            endif
-
-        end do
-
-        if(mype==0) close(iunit)
-     enddo ! n
-
-     deallocate(z1,workh,vector)
+     deallocate(z1,workh,vector,pert_unit)
   endif
 
   deallocate(en_perts)
