@@ -256,8 +256,19 @@ subroutine read_gps(nread,ndata,nodata,infile,lunout,obstype,twind, &
         endif
  
 ! Check profile quality flags
+!        if ( ((said > 739).and.(said < 746)).or.(said == 820).or.(said == 786).or.&
+!CZ: 999 for GeoOptics
+!KMN: 269 for Spire provided
+!KMN: 600-602 for GeoOptics provided
+!KMN: 970,972,974,976,979,980,981,985,986,990,991,992 for Spire
+!WM: PAZ(044) and COSMIC2(750-5) and geoopt round 3(265)
         if ( ((said > 739).and.(said < 746)).or.(said == 820).or.(said == 786).or.&
-             ((said > 749).and.(said < 756)).or.(said == 825).or.(said == 44) ) then  !CDAAC processing
+              (said == 825) .or. (said == 999) .or. (said == 970) .or.(said == 972).or.& 
+              (said == 974) .or. (said == 976) .or. (said == 979) .or.(said == 980).or.& 
+              (said == 981) .or. (said == 985) .or. (said == 986) .or.(said == 990).or.& 
+              (said == 269) .or. (said == 600) .or. (said == 601) .or.(said == 602).or.& 
+              (said == 044) .or. ((said > 749) .and. (said < 756)) .or.(said == 265).or.&
+              (said == 991) .or. (said == 992)) then  !CDAAC processing  
            if(pcc==zero) then
 !             write(6,*)'READ_GPS:  bad profile said=',said,'ptid=',ptid,&
 !                 ' SKIP this report'
@@ -266,7 +277,7 @@ subroutine read_gps(nread,ndata,nodata,infile,lunout,obstype,twind, &
         endif
 
         if ((said == 4).or.(said == 3).or.(said == 421).or.(said == 440).or.&
-            (said == 821).or.(said == 5)) then ! GRAS SAF processing
+            (said == 821)) then ! GRAS SAF processing
            call upftbv(lnbufr,nemo,qfro,mxib,ibit,nib)
            lone = .false.
              if(nib > 0) then

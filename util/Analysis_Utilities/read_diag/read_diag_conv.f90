@@ -1,4 +1,4 @@
-PROGRAM read_diag_conv
+PROGRAM read_diag_gps
 !
 !  This program is to show how to 
 !  read GSI diagnositic file for conventional data, which are
@@ -12,8 +12,7 @@ PROGRAM read_diag_conv
 !      setupgps.f90
 !
 !  For example in setupt.f90:
-!      the arrary contents disgnosis information is rdiagbuf.
-!        cdiagbuf(ii)       ! station id
+!        cdiagbuf(ii)       ! station id receiver occ id, transmitter occ id
 !        rdiagbuf(1,ii)     ! observation type
 !        rdiagbuf(2,ii)     ! observation subtype
 !        rdiagbuf(3,ii)     ! observation latitude (degrees)
@@ -38,6 +37,38 @@ PROGRAM read_diag_conv
 !     write(7)'  t',nchar,nreal,ii,mype
 !     write(7)cdiagbuf(1:ii),rdiagbuf(:,1:ii)
 !
+!  For example in setupbend.f90:
+!      the arrary contents disgnosis information is rdiagbuf.
+!        cdiagbuf(ii)       ! receiver occ id, transmitter occ id
+!        rdiagbuf(1,ii)     ! observation type
+!        rdiagbuf(2,ii)     ! profile identifier
+!        rdiagbuf(3,ii)     ! observation latitude (degrees)
+!        rdiagbuf(4,ii)     ! observation longitude (degrees)
+!        rdiagbuf(5,ii)     ! obs-ges/obs (percentage)
+!        rdiagbuf(6,ii)     ! pressure at obs location (hPa) if monotone grid
+!        rdiagbuf(7,ii)     ! impact height (meters)
+!        rdiagbuf(8,ii)     ! obs time (hours relative to analysis time)
+!        rdiagbuf(9,ii)     ! model terrain (m)
+!        rdiagbuf(10,ii)    ! qc flag
+!        rdiagbuf(11,ii)    ! data usage flag
+!        rdiagbuf(12,ii)    ! analysis usage flag (1=use, -1=not used)
+!        rdiagbuf(13,ii)    ! nonlinear qc relative weight
+!        rdiagbuf(14,ii)    ! original inverse obs error (rad**-1)
+!        rdiagbuf(15,ii)    ! original error+represent error inverse
+                            ! gps obs error (rad**-1)
+!        rdiagbuf(16,ii)    ! final inverse observation error due to 
+                            ! superob factor (rad**-1) and qc
+                            ! modified in genstats_gps
+!        rdiagbuf(17,ii)    ! bending angle observation (radians)
+!        rdiagbuf(18,ii)    ! temperature at obs location (K) if monotone grid
+!        rdiagbuf(19,ii)    ! model vertical grid (interface)
+!        rdiagbuf(20,ii)    ! one=use of bending angle
+!        rdiagbuf(21,ii)    ! specific humidity at obs location (kg/kg) if
+!        monotone grid
+! output from genstats_gps.f90
+!     write(7)'gps',nchar,nreal,icnt,mype,ioff
+!     write(7)cdiag,sdiag
+! 
 
   use kinds, only: r_kind,r_single,i_kind
 
@@ -56,13 +87,14 @@ PROGRAM read_diag_conv
 !
   character(180) :: infilename        ! file from GSI running directory
   character(180) :: outfilename       ! file name saving results
-  namelist/iosetup/ infilename, outfilename
+  logical :: if_write_gps_only
+  namelist/iosetup/ infilename, outfilename, if_write_gps_only
 !
 ! output variables
 !
   character(len=3)  :: var
-  real :: rlat,rlon,rprs,robs1,rdpt1,robs2,rdpt2,ruse,rerr
-  real :: rdhr, ddiff
+  real :: rlat,rlon,rprs,robs1,rges1,rdpt1,robs2,rdpt2,ruse,rerr
+  real :: rdhr, ddiff, perr,perdiff, rhgt, temp, sh
   character(8) :: stationID
   integer :: itype,iuse,iusev
 !
@@ -72,9 +104,15 @@ PROGRAM read_diag_conv
   integer :: i,j,k,ios
   integer :: ic, iflg
 
+  integer,dimension(300):: imap_ps,imap_t,imap_q,imap_pw,imap_sst,imap_uv
+!
+!  tiny_r_kind = tiny(0)
+!
+  call convinfo_read(imap_ps,imap_t,imap_q,imap_pw,imap_sst,imap_uv)
 !
   outfilename='diag_results'
-  open(11,file='namelist.conv')
+  open(11,file='namelist.gps')
+!  open(11,file='namelist.conv')
    read(11,iosetup)
   close(11)
 !
@@ -99,8 +137,64 @@ PROGRAM read_diag_conv
      read(17, ERR=999,end=110) var, nchar,nreal,ii,mype
      write(*,*) var, nchar,nreal,ii,mype
      if (ii > 0) then
-          allocate(cdiagbuf(ii),rdiagbuf(nreal,ii))
-          read(17,ERR=999,end=110) cdiagbuf, rdiagbuf
+        allocate(cdiagbuf(ii),rdiagbuf(nreal,ii))
+        read(17,ERR=999,end=110) cdiagbuf, rdiagbuf
+        if (var == 'gps') then
+          do i=1,ii
+             itype=rdiagbuf(1,i)    ! observation type
+             rlat=rdiagbuf(3,i)     ! observation latitude (degrees)
+             rlon=rdiagbuf(4,i)     ! observation longitude (degrees)
+             perdiff=rdiagbuf(5,i)  ! obs-ges/obs (percentage)
+             rprs=rdiagbuf(6,i)     ! observation pressure (hPa)
+             rhgt=rdiagbuf(7,i)     ! impact height (meters)
+             rdhr=rdiagbuf(8,i)     ! obs time (hours relative to analysis time)
+             iusev=int(rdiagbuf(11,i))    ! data usage flag ( value ) 
+             iuse=int(rdiagbuf(12,i))    ! analysis usage flag (1=use, -1=monitoring ) 
+             robs1=rdiagbuf(17,i)     ! bending angle observation (radians)
+             ddiff=robs1*perdiff      ! obs-ges used in analysis (K)
+             rges1=robs1-ddiff  ! ges=obs-ddiff
+             temp=rdiagbuf(18,i)  ! temperature (k)
+             sh=rdiagbuf(21,i)    ! specific humidity (kg/kg)
+             rerr = 0
+             if (rdiagbuf(14,i) > 0) then   ! initial inverse observation error ( 10**-3 radians)
+               perr=1.0/rdiagbuf(14,i)
+             end if 
+             if (rdiagbuf(16,i) > 0) then   ! final inverse observation error ( 10**-3 radians)
+               rerr=1.0/rdiagbuf(16,i)
+             end if 
+
+! get station ID
+             stationID = cdiagbuf(i)
+!             print*, 'stationID= ', stationID
+             iflg = 0
+             do ic=8,1,-1
+              ch = stationID(ic:ic)
+              if (ch > ' ' .and. ch <= 'z') then
+                iflg = 1
+              else
+                 stationID(ic:ic) = ' '
+              end if
+              if (ch == ' '  .and. iflg == 1) then
+                 stationID(ic:ic) = '_'
+              endif 
+             enddo
+
+             rhgt=rhgt/1000.0 !km
+             perdiff=perdiff*100. !(percentage)
+
+!  write out result for one variable on one pitch
+             if ( if_write_gps_only ) then
+               write (42,'(I3,F10.2,F8.2,F8.2,F8.2,F8.2, I5, F11.6,F11.6, 3F11.6, F10.2)') &
+                 itype,rdhr,rlat,rlon,rprs,rhgt,iuse,robs1,rges1,ddiff,perr,rerr,perdiff
+             else
+               write (42,'(A3," @ ",A8," : ",I3,F10.2,F8.2,F8.2,F8.2,F8.2, I5, F11.6, F11.6, 3F11.6, F10.2)') &
+                 var,stationID,itype,rdhr,rlat,rlon,rprs,rhgt,iuse,robs1,rges1,ddiff,perr,rerr,perdiff
+             endif  ! end for if_write_gps_only
+
+          enddo   ! i  end for one station
+
+        else !if not gps
+
           do i=1,ii
              itype=rdiagbuf(1,i)    ! observation type
              rlat=rdiagbuf(3,i)     ! observation latitude (degrees)
@@ -148,21 +242,25 @@ PROGRAM read_diag_conv
 !
 !  write out result for one variable on one pitch
              if (var .ne. " uv") then
-                write (42,'(A3," @ ",A8," : ",I3,F10.2,F8.2,F8.2,F8.2,I5,2F10.2)') &
+               if ( .not. if_write_gps_only ) then
+                 write (42,'(A3," @ ",A8," : ",I3,F10.2,F8.2,F8.2,F8.2,I5,2F10.2)') &
                    var,stationID,itype,rdhr,rlat,rlon,rprs,iuse,robs1,ddiff
+               endif
              else
 !  ** When the data is uv, additional output is needed **/
                 robs2=rdiagbuf(20,i)
                 rdpt2=rdiagbuf(21,i)
-                write (42,'(A3," @ ",A8," : ",I3,F10.2,F8.2,F8.2,F8.2,I5,4F10.2)') &
+               if ( .not. if_write_gps_only ) then
+                 write (42,'(A3," @ ",A8," : ",I3,F10.2,F8.2,F8.2,F8.2,I5,4F10.2)') &
                    var,stationID,itype,rdhr,rlat,rlon,rprs,iuse,robs1,ddiff,robs2, rdpt2
+               endif
              endif
-
-
 
           enddo   ! i  end for one station
 
-          deallocate(cdiagbuf,rdiagbuf)
+        endif !gps or other conv variables
+
+        deallocate(cdiagbuf,rdiagbuf)
      else
         read(17)
      endif
@@ -177,4 +275,85 @@ PROGRAM read_diag_conv
 999    PRINT *,'error read in diag file'
       stop 1234
 
-END PROGRAM read_diag_conv
+END PROGRAM read_diag_gps
+
+subroutine convinfo_read(imap_ps,imap_t,imap_q,imap_pw,imap_sst,imap_uv)
+!$$$  subprogram documentation block
+!                .      .    .                                       .
+! subprogram:    convinfo_read      read conventional information file
+!
+    character(len=1)cflg
+    character(len=16) cob
+    character(len=7) iotype
+    character(len=120) crecord
+    integer lunin,i,n,nc,ier,istat
+    integer nlines,maxlines
+
+    character(len=16),allocatable, dimension(:)::ioctype
+    integer,allocatable,dimension(:):: icuse,ictype,icsubtype
+    integer,dimension(300):: imap_ps,imap_t,imap_q,imap_pw,imap_sst,imap_uv
+
+    imap_ps=-10
+    imap_t=-10
+    imap_q=-10
+    imap_pw=-10
+    imap_sst=-10
+    imap_uv=-10
+    lunin = 47
+    open(lunin,file='convinfo',form='formatted')
+    rewind(lunin)
+    nconvtype=0
+    nlines=0
+    read1: do
+      read(lunin,1030,err=333, end=300)cflg,iotype
+1030  format(a1,a7,2x,a120)
+      nlines=nlines+1
+      if(cflg == '!')cycle
+      nconvtype=nconvtype+1
+    enddo read1
+
+300 continue
+
+    if(nconvtype == 0) then
+       write(6,*) 'CONVINFO_READ: NO CONVENTIONAL DATA USED'
+       return
+    endif
+
+    allocate(icuse(nconvtype),ictype(nconvtype),icsubtype(nconvtype), &
+             ioctype(nconvtype))
+
+    rewind(lunin)
+    do i=1,nlines
+       read(lunin,1030)cflg,iotype,crecord
+       if(cflg == '!')cycle
+       nc=nc+1
+       ioctype(nc)=iotype
+           !otype   type isub iuse 
+           !ps       120    0    1 
+ !ioctype(nc),
+           !  ictype(nc),
+           !     icsubtype(nc),
+           !              icuse(nc),
+
+       read(crecord,*)ictype(nc),icsubtype(nc),icuse(nc)
+!       write(6,1031)ioctype(nc),ictype(nc),icsubtype(nc),icuse(nc)
+1031   format('READ_CONVINFO: ',a7,1x,i3,1x,i4,1x,i2,1x,g12.6)
+       if(trim(ioctype(nc)) == 'ps') imap_ps(ictype(nc))=icuse(nc)
+       if(trim(ioctype(nc)) == 't') imap_t(ictype(nc))=icuse(nc)
+       if(trim(ioctype(nc)) == 'q') imap_q(ictype(nc))=icuse(nc)
+       if(trim(ioctype(nc)) == 'pw') imap_pw(ictype(nc))=icuse(nc)
+       if(trim(ioctype(nc)) == 'sst') imap_sst(ictype(nc))=icuse(nc)
+       if(trim(ioctype(nc)) == 'uv') imap_uv(ictype(nc))=icuse(nc)
+
+    enddo
+
+    close(lunin)
+!    DO i =1, 300
+!    write(*,'(10I4)') i, imap_t(i),imap_q(i),imap_pw(i),imap_sst(i),imap_uv(i)
+!    enddo
+
+    return
+333 continue
+    write(*,*) ' error in read'
+    stop 1234
+  end subroutine convinfo_read
