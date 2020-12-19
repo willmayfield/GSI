@@ -10,7 +10,7 @@ cat <<EOF > gsiparm.anl
    iguess=-1,
    oneobtest=.false.,retrieval=.false.,l_foto=.false.,verbose=.true., 
    use_pbl=.false.,use_compress=.true.,nsig_ext=12,gpstop=50.,
-   use_gfs_nemsio=${if_nemsio},lrun_subdirs=.false.,
+   use_gfs_nemsio=${if_nemsio},use_gfs_ncio=${if_ncio},lrun_subdirs=.false.,
    newpc4pred=.true.,adp_anglebc=.true.,angord=4,passive_bc=.true.,use_edges=.false.,diag_precon=.true.,step_start=1.0e-3,emiss_bc=.true.,cwoption=3,
    deltim=$DELTIM,
    lread_obs_save=${if_read_obs_save},lread_obs_skip=${if_read_obs_skip},
